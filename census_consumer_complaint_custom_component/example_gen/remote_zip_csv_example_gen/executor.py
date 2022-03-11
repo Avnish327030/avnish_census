@@ -16,7 +16,7 @@ import datetime
 import os
 from typing import Any, Dict
 from tfx.dsl.io import fileio
-from tfx.components.example_gen.csv_example_gen.executor import _ReadCsvRecordsFromTextFile,_ParsedCsvToTfExample
+from tfx.components.example_gen.csv_example_gen.executor import _CsvToExample
 import pandas as pd
 from absl import logging
 import apache_beam as beam
@@ -63,73 +63,7 @@ def _ZipToExample(  # pylint: disable=invalid-name
     # extracting zip file and deleteing zip file from directory
     extract_zip_file(zip_file_path, input_base_uri)
     os.remove(zip_file_path)
-    input_base_uri = exec_properties[standard_component_specs.INPUT_BASE_KEY]
-    _csv_pattern = os.path.join(input_base_uri, split_pattern)
-    csv_files = fileio.glob(_csv_pattern)
-    if not csv_files:
-        raise RuntimeError('Split pattern {} does not match any files.'.format(
-            _csv_pattern))
-
-    column_names = io_utils.load_csv_column_names(csv_files[0])
-    for csv_file in csv_files[1:]:
-        if io_utils.load_csv_column_names(csv_file) != column_names:
-            raise RuntimeError(
-                'Files in same split {} have different header.'.format(
-                    _csv_pattern))
-
-    # Read each CSV file while maintaining order. This is done in order to group
-    # together multi-line string fields.
-    parsed_csv_lines = (
-            pipeline
-            | 'CreateFilenames' >> beam.Create(csv_files)
-            | 'ReadFromText' >> beam.ParDo(_ReadCsvRecordsFromTextFile())
-            | 'ParseCSVLine' >> beam.ParDo(csv_decoder.ParseCSVLine(delimiter=','))
-            | 'ExtractParsedCSVLines' >> beam.Keys())
-    column_infos = beam.pvalue.AsSingleton(
-        parsed_csv_lines
-        | 'InferColumnTypes' >> beam.CombineGlobally(
-            csv_decoder.ColumnTypeInferrer(column_names, skip_blank_lines=True))
-    )
-
-    return (parsed_csv_lines
-            |
-            'ToTFExample' >> beam.ParDo(_ParsedCsvToTfExample(), column_infos))
-
-    # obtain csv file path
-    # file_name = os.listdir(input_base_uri)[0]
-    # csv_file_path = os.path.join(input_base_uri, file_name)
-    #
-    # df = pd.read_csv(csv_file_path, chunksize=500000)
-    # file_no = 1
-    # columns = None
-    # for data_frame in df:
-    #     if columns is None:
-    #         columns = data_frame.columns
-    #     file_name_, extension = file_name.split(".")
-    #     split_file_name = f"{file_name_}_{file_no}.{extension}"
-    #     data_frame.to_csv(os.path.join(input_base_uri, split_file_name), index=None, header=True)
-    #     file_no += 1
-    #     print(split_file_name)
-    # os.remove(csv_file_path)
-    # # # comment the cdode
-    # # import pandas as pd
-    # # df = pd.read_csv(csv_file_path)
-    # # os.remove(csv_file_path)
-    # # df.iloc[:3000, :].to_csv(csv_file_path, index=None, header=True, mode="w")
-    #
-    # # uncomment the code
-    # return (pipeline
-    #         | 'ReadCsvFile' >> beam.io.ReadFromText(os.path.join(input_base_uri, split_pattern),
-    #                                                 skip_header_lines=1)
-    #         | 'ParseFile' >> beam.Map(parse_file, columns)
-    #         | "ToTFExample" >> beam.Map(utils.dict_to_example)
-    #         )
-
-    # utils.dict_to_example()
-    # return (pipeline
-    #         | 'ReadFromAvro' >> beam.io.ReadFromAvro(avro_pattern)
-    #         | 'ToTFExample' >> beam.Map(utils.dict_to_example))
-
+    return _CsvToExample(exec_properties=exec_properties,split_pattern=split_pattern).expand(pipeline=pipeline)
 
 class Executor(BaseExampleGenExecutor):
     """TFX example gen executor for processing remote zip csv format.

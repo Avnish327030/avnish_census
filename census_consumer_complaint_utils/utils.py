@@ -2,7 +2,7 @@ import csv
 import datetime
 import sys, os
 import tensorflow as tf
-import shutil, wget
+import shutil
 from census_consumer_complaint_exception.exception import CensusConsumerException
 from urllib import request
 import random
