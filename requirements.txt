@@ -1,5 +1,4 @@
 tfx==1.6.1
-wget
 jupyterlab
 apache-beam[interactive]
 apache-airflow

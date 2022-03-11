@@ -13,7 +13,6 @@ from zipfile import ZipFile
 
 CSV_FILE_EXTENSION = ".csv"
 TF_RECORD_FILE_EXTENSION = ".tfrecord"
-SPLIT_URI = namedtuple("Split", ["split_train", "split_eval"])
 ROW = 0
 
 
@@ -55,25 +54,20 @@ def _int64_feature(value):
         raise Exception(CensusConsumerException(e, sys)) from e
 
 
-def _convert_csv_file_to_tf_record_file(csv_file_path, tf_record_file_dir: SPLIT_URI, split_size=0.2):
+def _convert_csv_file_to_tf_record_file(csv_file_path, tf_record_file_dir: str):
     try:
-        response = {}
         n_row = 0
         tf_record_file_name = os.path.basename(csv_file_path).replace(CSV_FILE_EXTENSION, TF_RECORD_FILE_EXTENSION)
-        os.makedirs(tf_record_file_dir.split_train, exist_ok=True)
-        os.makedirs(tf_record_file_dir.split_eval, exist_ok=True)
-        tf_record_train_file_path = os.path.join(tf_record_file_dir.split_train,
-                                                 tf_record_file_name)
-        tf_record_eval_file_path = os.path.join(tf_record_file_dir.split_eval,
-                                                tf_record_file_name
-                                                )
-        tf_record_train_file_writer = tf.io.TFRecordWriter(tf_record_train_file_path)
-        tf_record_eval_file_writer = tf.io.TFRecordWriter(tf_record_eval_file_path)
-
+        tf_record_file_path=os.path.join(tf_record_file_dir,tf_record_file_name)
+        tf_record_file_writer = tf.io.TFRecordWriter(tf_record_file_path)
         with open(csv_file_path) as csv_file:
             reader = csv.DictReader(csv_file, delimiter=",", quotechar='"')
             for row in reader:
                 n_row += 1
+                if n_row%500000==0:
+                    print(n_row,"\n",datetime.datetime.now())
+                    break
+                    
 
                 example = tf.train.Example(features=tf.train.Features(
                     feature={
@@ -91,31 +85,14 @@ def _convert_csv_file_to_tf_record_file(csv_file_path, tf_record_file_dir: SPLIT
                     }
                 )
                 )
-                if n_row % 10 > 7:
-                    tf_record_eval_file_writer.write(example.SerializeToString())
-
-                else:
-                    tf_record_train_file_writer.write(example.SerializeToString())
-
-        tf_record_eval_file_writer.close()
-        tf_record_train_file_writer.close()
-
-        # random.shuffle(tf_record_file_content)
-        # test_size = len(tf_record_file_content) * split_size
-        # row_number = 1
-        # for content in tf_record_file_content:
-        #     if row_number > test_size:
-        #         tf_record_train_file_writer.write(content.SerializeToExample())
-        #     else:
-        #         tf_record_eval_file_writer.write(content.SerializeToExample())
-        #     row_number += 1
-        # tf_record_train_file_writer.close()
-        # tf_record_eval_file_writer.close()
+            
+            tf_record_file_writer.write(example.SerializeToString())  
+        tf_record_file_writer.close()
     except Exception as e:
         raise Exception(CensusConsumerException(e, sys)) from e
 
 
-def transform_csv_to_tf_record_file(csv_file_dir, tf_record_file_dir: SPLIT_URI, split_size=0.2):
+def transform_csv_to_tf_record_file(csv_file_dir, tf_record_file_dir: str):
     """
     Description: This function accept csv file directory and converts all csv file into
     tfrecord file at tf_record_file_dir
@@ -130,9 +107,12 @@ def transform_csv_to_tf_record_file(csv_file_dir, tf_record_file_dir: SPLIT_URI,
 
         csv_files = filter(lambda x: x.endswith(CSV_FILE_EXTENSION),
                            os.listdir(csv_file_dir))
+        os.makedirs(tf_record_file_dir,exist_ok=True)
+        print(csv_files,tf_record_file_dir)
         for file in csv_files:
             csv_file_path = os.path.join(csv_file_dir, file)
             _convert_csv_file_to_tf_record_file(csv_file_path, tf_record_file_dir)
+            os.remove(csv_file_path)
     except Exception as e:
         raise (CensusConsumerException(e, sys)) from e
 
@@ -145,6 +125,7 @@ def extract_zip_file(zip_file_path: str, extract_dir: str, zip_file_read_mode: s
   output_dir: The directory to extract the zip file to.
   """
     try:
+        print("Extracting file in ",extract_dir)
         os.makedirs(extract_dir, exist_ok=True)
         with ZipFile(zip_file_path, zip_file_read_mode) as zip_file:
             zip_file.extractall(extract_dir)
@@ -183,6 +164,7 @@ def download_datatset(zip_file_uri: str, download_dir: str) -> str:
   """
 
     try:
+        print("Downloading file in ",download_dir)
         # Creating download_dir if not exists
         if os.path.exists(download_dir):
             shutil.rmtree(download_dir)

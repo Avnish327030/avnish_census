@@ -7,8 +7,8 @@ from collections import namedtuple
 ZIP_INPUT_DATASET_URL = "https://files.consumerfinance.gov/ccdb/complaints.csv.zip"
 ZIP_CSV_EXTRACTOR_GEN_NAME = "ZIP_CSV_EXTRACTOR_GEN"
 DataIngestion = namedtuple("DataIngestion", ["zip_example_gen"])
-INPUT_BASE = os.path.join("zip_to_csv")
-from tfx.components import CsvExampleGen
+INPUT_BASE = os.path.join(os.getcwd(),"zip_to_csv")
+from tfx.components import CsvExampleGen,ImportExampleGen
 from census_consumer_complaint_custom_component.example_gen import RemoteZipCsvExampleGen
 
 

@@ -15,7 +15,7 @@
 
 from typing import Optional, Union
 
-from census_consumer_complaint_custom_component.example_gen.remote_zip_csv_example_gen import executor
+from census_consumer_complaint_custom_component.example_gen.remote_zip_csv_example_gen import executor_test as executor
 from census_consumer_complaint_custom_component.component import RemoteZipFileBasedExampleGen
 from tfx.dsl.components.base import executor_spec
 from tfx.orchestration import data_types

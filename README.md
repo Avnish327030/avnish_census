@@ -8,7 +8,7 @@ export AIRFLOW_HOME="/home/avnish/census_consumer_project/census_consumer_compla
 
 To install airflow 
 ```
-pip install apche-airflow
+pip install apache-airflow
 ```
 
 To configure databse
