@@ -10,7 +10,7 @@ LOG_DIR = 'logs'
 SERVING_MODEL_DIR = "saved_models"
 DAYS = 1  # scheduled interval day
 SCHEDULED_INTERVAL = datetime.timedelta(days=DAYS)
-START_DATE = datetime.datetime(2022, 3, 7)
+START_DATE = datetime.datetime(2022, 3, 5)
 
 
 class CensusConsumerConfiguration:

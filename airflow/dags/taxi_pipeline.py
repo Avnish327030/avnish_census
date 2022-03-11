@@ -36,10 +36,9 @@ from tfx.proto import pusher_pb2
 from tfx.proto import trainer_pb2
 from tfx.orchestration.metadata import sqlite_metadata_connection_config
 
-
 # This example assumes that the taxi data is stored in ~/taxi/data and the
 # taxi utility function is in ~/taxi.  Feel free to customize this as needed.
-_taxi_root = '/home/avnish/airflow/dags' 
+_taxi_root = '/home/avnish/census_consumer_project/census_consumer_complaint/airflow/dags/data'
 _data_root = os.path.join(_taxi_root, 'data/taxi_data')
 # Python module file to inject customized logic into the TFX components. The
 # Transform and Trainer both require user-defined functions to run successfully.
@@ -53,7 +52,7 @@ _serving_model_dir = os.path.join(_taxi_root, 'saved_models/taxi')
 # these files anywhere on your local filesystem.
 _tfx_root = os.path.join(_taxi_root, 'tfx')
 _pipeline_root = os.path.join(_tfx_root, 'pipelines')
-_metadata_db_root = os.path.join(_tfx_root, 'metadata',"metadata.db")
+_metadata_db_root = os.path.join(_tfx_root, 'metadata', "metadata.db")
 _log_root = os.path.join(_tfx_root, 'logs')
 
 # Airflow-specific configs; these will be passed directly to airflow
@@ -67,22 +66,22 @@ logger_overrides = {'log_root': _log_root, 'log_level': logging.INFO}
 
 
 def _create_pipeline():
-  """Implements the chicago taxi pipeline with TFX."""
-  # Brings data into the pipeline or otherwise joins/converts training data.
-  example_gen = CsvExampleGen(input_base=_data_root)
+    """Implements the chicago taxi pipeline with TFX."""
+    # Brings data into the pipeline or otherwise joins/converts training data.
+    example_gen = CsvExampleGen(input_base=_data_root)
 
-  # Computes statistics over data for visualization and example validation.
-  statistics_gen = StatisticsGen(examples=example_gen.outputs['examples'])
+    # Computes statistics over data for visualization and example validation.
+    statistics_gen = StatisticsGen(examples=example_gen.outputs['examples'])
 
-  # Generates schema based on statistics files.
-  infer_schema = SchemaGen(statistics=statistics_gen.outputs['statistics'])
+    # Generates schema based on statistics files.
+    infer_schema = SchemaGen(statistics=statistics_gen.outputs['statistics'])
 
-  # Performs anomaly detection based on statistics and data schema.
-  validate_stats = ExampleValidator(
-      statistics=statistics_gen.outputs['statistics'], schema=infer_schema.outputs['schema'])
-    
-  # Performs transformations and feature engineering in training and serving.
-  """
+    # Performs anomaly detection based on statistics and data schema.
+    validate_stats = ExampleValidator(
+        statistics=statistics_gen.outputs['statistics'], schema=infer_schema.outputs['schema'])
+
+    # Performs transformations and feature engineering in training and serving.
+    """
   transform = Transform(
       examples=example_gen.outputs['examples'],
       schema=infer_schema.outputs['schema'],
@@ -119,18 +118,18 @@ def _create_pipeline():
           filesystem=pusher_pb2.PushDestination.Filesystem(
               base_directory=_serving_model_dir)))
             
-  """  
-  return pipeline.Pipeline(
-      pipeline_name='taxi',
-      pipeline_root=_pipeline_root,
-      components=[
-          example_gen, statistics_gen, infer_schema, validate_stats,# transform,
-         # trainer, model_analyzer, model_validator, pusher
-      ],
-      enable_cache=True,
-      metadata_connection_config= sqlite_metadata_connection_config(_metadata_db_root),
-      additional_pipeline_args={'logger_args': logger_overrides},
-  )
+  """
+    return pipeline.Pipeline(
+        pipeline_name='taxi',
+        pipeline_root=_pipeline_root,
+        components=[
+            example_gen, statistics_gen, infer_schema, validate_stats,  # transform,
+            # trainer, model_analyzer, model_validator, pusher
+        ],
+        enable_cache=True,
+        metadata_connection_config=sqlite_metadata_connection_config(_metadata_db_root),
+        additional_pipeline_args={'logger_args': logger_overrides},
+    )
 
 
 airflow_pipeline = AirflowDAGRunner(_airflow_config).run(_create_pipeline())

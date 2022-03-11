@@ -1,8 +1,20 @@
+import csv
+import datetime
 import sys, os
 import tensorflow as tf
 import shutil, wget
 from census_consumer_complaint_exception.exception import CensusConsumerException
 from urllib import request
+import random
+import numpy as np
+from collections import namedtuple
+from collections import OrderedDict
+from zipfile import ZipFile
+
+CSV_FILE_EXTENSION = ".csv"
+TF_RECORD_FILE_EXTENSION = ".tfrecord"
+SPLIT_URI = namedtuple("Split", ["split_train", "split_eval"])
+ROW = 0
 
 
 # defining function to convert value to appropriate data type which tf.Example accepts
@@ -43,22 +55,141 @@ def _int64_feature(value):
         raise Exception(CensusConsumerException(e, sys)) from e
 
 
-def download_dataset(uri: str, download_dir: str) -> str:
+def _convert_csv_file_to_tf_record_file(csv_file_path, tf_record_file_dir: SPLIT_URI, split_size=0.2):
+    try:
+        response = {}
+        n_row = 0
+        tf_record_file_name = os.path.basename(csv_file_path).replace(CSV_FILE_EXTENSION, TF_RECORD_FILE_EXTENSION)
+        os.makedirs(tf_record_file_dir.split_train, exist_ok=True)
+        os.makedirs(tf_record_file_dir.split_eval, exist_ok=True)
+        tf_record_train_file_path = os.path.join(tf_record_file_dir.split_train,
+                                                 tf_record_file_name)
+        tf_record_eval_file_path = os.path.join(tf_record_file_dir.split_eval,
+                                                tf_record_file_name
+                                                )
+        tf_record_train_file_writer = tf.io.TFRecordWriter(tf_record_train_file_path)
+        tf_record_eval_file_writer = tf.io.TFRecordWriter(tf_record_eval_file_path)
+
+        with open(csv_file_path) as csv_file:
+            reader = csv.DictReader(csv_file, delimiter=",", quotechar='"')
+            for row in reader:
+                n_row += 1
+
+                example = tf.train.Example(features=tf.train.Features(
+                    feature={
+                        "product": _bytes_feature(row["Product"]),
+                        "sub_product": _bytes_feature(row["Sub-product"]),
+                        "issue": _bytes_feature(row["Issue"]),
+                        "sub_issue": _bytes_feature(row["Sub-issue"]),
+                        "state": _bytes_feature(row["State"]),
+                        "zip_code": _bytes_feature((row["ZIP code"])),
+                        "company": _bytes_feature(row["Company"]),
+                        "company_response": _bytes_feature(row["Company response to consumer"]),
+                        "consumer_complaint_narrative": _bytes_feature(row["Consumer complaint narrative"]),
+                        "timely_response": _bytes_feature(row["Timely response?"]),
+                        "consumer_disputed": _bytes_feature(row["Consumer disputed?"]),
+                    }
+                )
+                )
+                if n_row % 10 > 7:
+                    tf_record_eval_file_writer.write(example.SerializeToString())
+
+                else:
+                    tf_record_train_file_writer.write(example.SerializeToString())
+
+        tf_record_eval_file_writer.close()
+        tf_record_train_file_writer.close()
+
+        # random.shuffle(tf_record_file_content)
+        # test_size = len(tf_record_file_content) * split_size
+        # row_number = 1
+        # for content in tf_record_file_content:
+        #     if row_number > test_size:
+        #         tf_record_train_file_writer.write(content.SerializeToExample())
+        #     else:
+        #         tf_record_eval_file_writer.write(content.SerializeToExample())
+        #     row_number += 1
+        # tf_record_train_file_writer.close()
+        # tf_record_eval_file_writer.close()
+    except Exception as e:
+        raise Exception(CensusConsumerException(e, sys)) from e
+
+
+def transform_csv_to_tf_record_file(csv_file_dir, tf_record_file_dir: SPLIT_URI, split_size=0.2):
     """
-    created by: Avnish Yadav
-    created on: 27/02/2022
-    version: 1.0
-    Download the dataset from the uri and save it in the download_dir
-    ============================================================================
-    uri: The uri of the dataset
-    download_dir: The directory where the dataset will be downloaded
+    Description: This function accept csv file directory and converts all csv file into
+    tfrecord file at tf_record_file_dir
+    =============================================================================
+    :param csv_file_dir: Dir path containing csv files
+    :param tf_record_file_dir: Dir path to generated tf record files from csv files
+    :return: dict with file_path and number of row
+    {file_path:n_row}
+
     """
     try:
 
-        os.makedirs(download_dir, exist_ok=True)
-        file_name = os.path.basename(uri)
-        file_path = os.path.join(download_dir, file_name)
-        request.urlretrieve(uri, file_path)
-        return file_path
+        csv_files = filter(lambda x: x.endswith(CSV_FILE_EXTENSION),
+                           os.listdir(csv_file_dir))
+        for file in csv_files:
+            csv_file_path = os.path.join(csv_file_dir, file)
+            _convert_csv_file_to_tf_record_file(csv_file_path, tf_record_file_dir)
     except Exception as e:
-        raise Exception(CensusConsumerException(e, sys)) from e
+        raise (CensusConsumerException(e, sys)) from e
+
+
+def extract_zip_file(zip_file_path: str, extract_dir: str, zip_file_read_mode: str = "r") -> None:
+    """Extracts a zip file to a directory.
+
+  Args:
+  zip_file_path: The path to the zip file.
+  output_dir: The directory to extract the zip file to.
+  """
+    try:
+        os.makedirs(extract_dir, exist_ok=True)
+        with ZipFile(zip_file_path, zip_file_read_mode) as zip_file:
+            zip_file.extractall(extract_dir)
+    except Exception as e:
+        raise e
+
+
+def parse_file(element, columns):
+    global ROW
+    ROW += 1
+
+    """Read a line of CSV file and transform it into ordered dict"""
+    for line in csv.reader([element], quotechar='"', delimiter=',', quoting=csv.QUOTE_ALL, skipinitialspace=True):
+
+        if len(line) != len(columns):
+            line = ["" for i in range(len(columns))]
+        if ROW % 100000 == 0:
+            print(ROW, datetime.datetime.now())
+            print(line)
+        return OrderedDict(zip(columns, line))
+
+
+## code added by Avnish327030
+def download_datatset(zip_file_uri: str, download_dir: str) -> str:
+    """Downloads a dataset from a given uri and saves it to a Download directory.
+
+  Args:
+    zip_file_uri: The uri of the dataset to download.
+    download_dir: The directory to save the dataset to.
+
+  Returns:
+    The path to the downloaded dataset.
+
+  Raises:
+    ValueError: If the dataset cannot be downloaded.
+  """
+
+    try:
+        # Creating download_dir if not exists
+        if os.path.exists(download_dir):
+            shutil.rmtree(download_dir)
+        os.makedirs(download_dir, exist_ok=True)
+        # Obtaining zip file path to download zip file
+        zip_file_path = os.path.join(download_dir, os.path.basename(zip_file_uri))
+        request.urlretrieve(zip_file_uri, zip_file_path)
+        return zip_file_path
+    except Exception as e:
+        raise ValueError('Failed to download dataset from {}. {}'.format(zip_file_uri, e))

@@ -24,5 +24,6 @@ def _create_pipeline():
 
 
 def run_local_dag_runner_pipeline():
-    LocalDagRunner().run(_create_pipeline())
+
+    LocalDagRunner().run(get_census_consumer_complaint_pipeline_component()[0])
 

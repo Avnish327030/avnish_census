@@ -10,9 +10,8 @@ def get_census_consumer_complaint_pipeline_component():
         pipeline_component = []
         data_ingestion = get_data_ingestion_components()
 
-        pipeline_component.append(data_ingestion.zip_csv_extractor_gen)
-        pipeline_component.append(data_ingestion.csv_example_gen)
-        data_validation = get_data_validation_components(csv_example_gen=data_ingestion.csv_example_gen)
+        pipeline_component.append(data_ingestion.zip_example_gen)
+        data_validation = get_data_validation_components(zip_example_gen=data_ingestion.zip_example_gen)
         pipeline_component.append(data_validation.statistic_gen)
         pipeline_component.append(data_validation.schema_gen)
 

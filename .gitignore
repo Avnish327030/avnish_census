@@ -6,4 +6,6 @@ airflow_config.py
 census_consumer_complaint_data/*
 venv/
 census_consumer_complaint.*
+zip_to_csv/*
+
 
