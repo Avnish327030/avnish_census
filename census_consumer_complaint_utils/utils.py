@@ -64,7 +64,7 @@ def _convert_csv_file_to_tf_record_file(csv_file_path, tf_record_file_dir: str):
             reader = csv.DictReader(csv_file, delimiter=",", quotechar='"')
             for row in reader:
                 n_row += 1
-                if n_row%1000000==0:
+                if n_row%100000==0:
                     print(n_row,"\n",datetime.datetime.now())
                     break
                     
